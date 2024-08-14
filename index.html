@@ -3,116 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio and Image to Video Converter</title>
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.9.8/dist/ffmpeg.min.js"></script>
+    <title>MP3 and Image to MP4 Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.10.1/ffmpeg.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #121212;
+            background-color: #2c2c2c;
             color: #e0e0e0;
         }
-        .input-group {
-            margin-bottom: 15px;
-        }
-        #status, #downloadLink {
-            margin-top: 20px;
-        }
-        .error {
-            color: #ff6b6b;
+        input, button {
+            margin: 10px 0;
+            padding: 10px;
+            width: 100%;
+            background-color: #3c3c3c;
+            color: #e0e0e0;
+            border: 1px solid #5c5c5c;
+            border-radius: 5px;
         }
         button {
-            background-color: #bb86fc;
-            color: #000;
-            border: none;
-            padding: 10px 20px;
             cursor: pointer;
-            transition: background-color 0.3s;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
         }
         button:hover {
-            background-color: #3700b3;
-            color: #fff;
-        }
-        button:disabled {
-            background-color: #4a4a4a;
-            cursor: not-allowed;
-        }
-        a {
-            color: #03dac6;
+            background-color: #45a049;
         }
         #status {
-            white-space: pre-line;
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #3c3c3c;
+            border-radius: 5px;
+        }
+        a {
+            color: #4CAF50;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
-    <h1>Audio and Image to Video Converter</h1>
-    
-    <div class="input-group">
-        <label for="imageInput">Select an image:</label>
-        <input type="file" id="imageInput" accept="image/*">
-    </div>
-
-    <div class="input-group">
-        <label for="audioInput">Select an audio file:</label>
-        <input type="file" id="audioInput" accept="audio/*">
-    </div>
-
-    <button id="convertBtn">Convert</button>
-
+    <h1>MP3 and Image to MP4 Converter</h1>
+    <input type="file" id="audioFile" accept=".mp3" />
+    <input type="file" id="imageFile" accept=".jpg,.jpeg,.png" />
+    <button onclick="convertToMP4()">Convert</button>
     <div id="status"></div>
-    <div id="downloadLink"></div>
+    <a id="downloadLink" style="display: none;">Download MP4</a>
 
     <script>
-        const { createFFmpeg, fetchFile } = FFmpeg;
-        const ffmpeg = createFFmpeg({ log: true });
+        let ffmpeg;
 
-        let imageFile, audioFile;
-        const convertBtn = document.getElementById('convertBtn');
+        const loadFFmpeg = async () => {
+            ffmpeg = await FFmpeg.createFFmpeg({ log: true });
+            await ffmpeg.load();
+        };
 
-        document.getElementById('imageInput').addEventListener('change', (e) => {
-            imageFile = e.target.files[0];
-        });
+        loadFFmpeg();
 
-        document.getElementById('audioInput').addEventListener('change', (e) => {
-            audioFile = e.target.files[0];
-        });
-
-        convertBtn.addEventListener('click', convertToVideo);
-
-        function updateStatus(message) {
-            const statusElement = document.getElementById('status');
-            statusElement.textContent += message + '\n';
-            console.log(message);
-        }
-
-        async function convertToVideo() {
-            const statusElement = document.getElementById('status');
-            const downloadLinkElement = document.getElementById('downloadLink');
+        async function convertToMP4() {
+            const audioFile = document.getElementById('audioFile').files[0];
+            const imageFile = document.getElementById('imageFile').files[0];
             
-            statusElement.textContent = '';
-            convertBtn.disabled = true;
-            
+            if (!audioFile || !imageFile) {
+                alert('Please select both an MP3 file and an image');
+                return;
+            }
+
+            const status = document.getElementById('status');
+            status.textContent = 'Converting...';
+
             try {
-                if (!imageFile || !audioFile) {
-                    throw new Error('Please select both an image and an audio file');
-                }
-
-                updateStatus('Loading FFmpeg...');
-                await ffmpeg.load();
-                updateStatus('FFmpeg loaded successfully.');
-
-                updateStatus('Writing image file...');
-                ffmpeg.FS('writeFile', 'image.jpg', await fetchFile(imageFile));
-                updateStatus('Image file written successfully.');
-
-                updateStatus('Writing audio file...');
                 ffmpeg.FS('writeFile', 'audio.mp3', await fetchFile(audioFile));
-                updateStatus('Audio file written successfully.');
+                ffmpeg.FS('writeFile', 'image.jpg', await fetchFile(imageFile));
 
-                updateStatus('Starting FFmpeg conversion...');
                 await ffmpeg.run(
                     '-loop', '1', 
                     '-i', 'image.jpg', 
@@ -125,22 +93,28 @@
                     '-shortest', 
                     'output.mp4'
                 );
-                updateStatus('FFmpeg conversion completed.');
 
-                updateStatus('Reading output file...');
                 const data = ffmpeg.FS('readFile', 'output.mp4');
-                const video = new Blob([data.buffer], { type: 'video/mp4' });
-                const url = URL.createObjectURL(video);
-                downloadLinkElement.innerHTML = `<a href="${url}" download="video.mp4">Download video</a>`;
-                updateStatus('Conversion completed successfully!');
+                const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
 
+                const downloadLink = document.getElementById('downloadLink');
+                downloadLink.href = url;
+                downloadLink.download = 'output.mp4';
+                downloadLink.style.display = 'block';
+
+                status.textContent = 'Conversion completed!';
             } catch (error) {
-                console.error('Conversion error:', error);
-                statusElement.innerHTML += `<span class="error">Error: ${error.message}</span>\n`;
-                statusElement.innerHTML += 'Please check the console for more details.\n';
-            } finally {
-                convertBtn.disabled = false;
+                status.textContent = 'Error: ' + error.message;
             }
+        }
+
+        function fetchFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(new Uint8Array(reader.result));
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
         }
     </script>
 </body>
