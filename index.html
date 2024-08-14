@@ -32,6 +32,11 @@
         button:hover {
             background-color: #45a049;
         }
+        button:disabled {
+            background-color: #cccccc;
+            color: #666666;
+            cursor: not-allowed;
+        }
         #status {
             margin-top: 20px;
             padding: 10px;
@@ -45,25 +50,43 @@
         a:hover {
             text-decoration: underline;
         }
+        #convertBtn {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <h1>MP3 and Image to MP4 Converter</h1>
-    <input type="file" id="audioFile" accept=".mp3" />
-    <input type="file" id="imageFile" accept=".jpg,.jpeg,.png" />
-    <button onclick="convertToMP4()">Convert</button>
-    <div id="status"></div>
+    <button id="initBtn" onclick="initFFmpeg()">Initialize FFmpeg</button>
+    <input type="file" id="audioFile" accept=".mp3" disabled />
+    <input type="file" id="imageFile" accept=".jpg,.jpeg,.png" disabled />
+    <button id="convertBtn" onclick="convertToMP4()" disabled>Convert</button>
+    <div id="status">Click "Initialize FFmpeg" to start</div>
     <a id="downloadLink" style="display: none;">Download MP4</a>
 
     <script>
         let ffmpeg;
 
-        const loadFFmpeg = async () => {
-            ffmpeg = await FFmpeg.createFFmpeg({ log: true });
-            await ffmpeg.load();
-        };
+        async function initFFmpeg() {
+            const initBtn = document.getElementById('initBtn');
+            const status = document.getElementById('status');
+            initBtn.disabled = true;
+            status.textContent = 'Initializing FFmpeg...';
 
-        loadFFmpeg();
+            try {
+                ffmpeg = await FFmpeg.createFFmpeg({ log: true });
+                await ffmpeg.load();
+                status.textContent = 'FFmpeg initialized. You can now convert files.';
+                document.getElementById('audioFile').disabled = false;
+                document.getElementById('imageFile').disabled = false;
+                document.getElementById('convertBtn').disabled = false;
+                initBtn.style.display = 'none';
+                document.getElementById('convertBtn').style.display = 'block';
+            } catch (error) {
+                status.textContent = 'Error initializing FFmpeg: ' + error.message;
+                initBtn.disabled = false;
+            }
+        }
 
         async function convertToMP4() {
             const audioFile = document.getElementById('audioFile').files[0];
@@ -75,7 +98,9 @@
             }
 
             const status = document.getElementById('status');
+            const convertBtn = document.getElementById('convertBtn');
             status.textContent = 'Converting...';
+            convertBtn.disabled = true;
 
             try {
                 ffmpeg.FS('writeFile', 'audio.mp3', await fetchFile(audioFile));
@@ -105,6 +130,8 @@
                 status.textContent = 'Conversion completed!';
             } catch (error) {
                 status.textContent = 'Error: ' + error.message;
+            } finally {
+                convertBtn.disabled = false;
             }
         }
 
